@@ -50,26 +50,45 @@ All nodes update synchronously — the same rule as NCA's parallel cell updates.
 
 ## Results
 
-| Version | Overall Acc | CONSISTENT Acc | CONTRADICTION Acc | Notes |
-|---------|------------|----------------|-------------------|-------|
-| Fixed Network (baseline) | 45.0% | 2.0% | 88.0% | Sequential Node1→2→3 pipeline |
-| NCA v1 | 49.0% | 0.0% | 98.0% | **Groupthink**: 99/100 tasks converged to CONTRADICTION |
-| NCA v2 | 55.0% | 80.0% | 30.0% | Anti-sycophancy prompt broke bias but overcorrected |
-| NCA v3 | 🔄 running | — | — | Devil's advocate rule to balance both directions |
-| NCA v4 | 🔄 pending | — | — | Confidence-weighted neighbor influence |
+| Version | Overall Acc | CONSISTENT Acc | CONTRADICTION Acc | vs Fixed | Notes |
+|---------|------------|----------------|-------------------|----------|-------|
+| Fixed Network (baseline) | 45.0% | 2.0% | 88.0% | --- | Sequential Node1→2→3 pipeline |
+| NCA v1 | 49.0% | 0.0% | 98.0% | +4.0% | Groupthink: 99/100 tasks converged to CONTRADICTION |
+| **NCA v2** | **55.0%** | **80.0%** | 30.0% | **+10.0%** | Anti-sycophancy prompt — best overall, but overcorrected |
+| NCA v3 | 52.0% | 6.0% | 98.0% | +7.0% | Devil's advocate rule — CONTRADICTION bias persisted |
+| NCA v4 | 53.0% | 24.0% | 82.0% | +8.0% | Confidence-weighted updates — best balance between both |
 
-### Key Findings (v1 vs v2)
+### Groupthink Statistics
+
+| Version | All CONTRADICTION | All CONSISTENT | Split |
+|---------|:-----------------:|:--------------:|:-----:|
+| NCA v1 | 99 | 0 | 0 |
+| NCA v2 | 17 | 65 | 18 |
+| NCA v3 | 77 | 2 | 21 |
+| NCA v4 | 75 | 17 | 8 |
+
+### Key Findings
 
 **Groupthink is real and severe.**
 In v1, 99 out of 100 tasks had all 3 nodes unanimously converge to CONTRADICTION — regardless of the correct answer. Local neighbor influence amplified the initial bias instead of correcting it.
 
 **Anti-sycophancy prompts work, but overshoot.**
-v2 introduced a rule forcing nodes to reconsider when all neighbors agreed. CONSISTENT accuracy jumped from 0% → 80%, but CONTRADICTION accuracy collapsed from 98% → 30%. The pendulum swung the other way.
+v2 introduced a rule forcing nodes to reconsider when all neighbors agreed. CONSISTENT accuracy jumped from 0% → 80%, but CONTRADICTION accuracy collapsed from 98% → 30%.
+
+**Devil's advocate (v3) wasn't strong enough.**
+The prompt-level intervention couldn't override qwen2.5:3b's inherent CONTRADICTION bias. 77/100 tasks still converged unanimously to CONTRADICTION.
+
+**Confidence weighting (v4) is the best balance.**
+By downweighting uncertain neighbors, v4 achieved 24% CONSISTENT and 82% CONTRADICTION — the most balanced result, with only 8 split decisions.
+
+**Root cause: model-level bias amplified by NCA propagation.**
+qwen2.5:3b has a strong tendency toward CONTRADICTION. NCA's local update steps propagate and reinforce this bias through neighbor influence, making it harder to overcome than in a fixed pipeline.
 
 ```
-v1: [CONTRADICTION, CONTRADICTION, CONTRADICTION] → 99% of the time
+v1: [CONTRADICTION, CONTRADICTION, CONTRADICTION] → 99% of the time (groupthink)
 v2: [CONSISTENT,    CONSISTENT,    CONSISTENT   ] → overcorrected
-v3: targeting balanced convergence
+v3: [CONTRADICTION, CONTRADICTION, CONTRADICTION] → devil's advocate too weak
+v4:  more balanced, but CONTRADICTION bias still dominates
 ```
 
 ---
@@ -102,16 +121,17 @@ python run_experiment_nca.py
 
 ```
 nca-llm-experiment/
-├── nca_network.py          # NCA network (current version)
+├── nca_network.py          # NCA network (latest: v4)
 ├── nca_network_v1.py       # v1: baseline NCA
 ├── nca_network_v2.py       # v2: anti-sycophancy prompts
+├── nca_network_v3.py       # v3: devil's advocate rule
 ├── run_experiment_nca.py   # Comparison experiment runner
 ├── results/
-│   ├── fixed_results.jsonl     # Baseline results
-│   ├── nca_results.jsonl       # NCA v1 results
-│   ├── nca_v2_results.jsonl    # NCA v2 results
-│   ├── nca_v3_results.jsonl    # NCA v3 results (in progress)
-│   └── nca_v4_results.jsonl    # NCA v4 results (pending)
+│   ├── fixed_results.jsonl      # Baseline results
+│   ├── nca_results.jsonl        # NCA v1 results
+│   ├── nca_v2_results.jsonl     # NCA v2 results
+│   ├── nca_v3_results.jsonl     # NCA v3 results
+│   └── nca_v4_results.jsonl     # NCA v4 results
 └── requirements.txt
 ```
 
